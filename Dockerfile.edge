@@ -1,0 +1,60 @@
+# y-ai-pond edge controller (TIER 1) — multi-stage Docker build
+#
+# Build:
+#   docker build -f Dockerfile.edge -t y-ai-pond-edge:0.1.0 . \
+#     --build-context yaiagentbase=../y-ai-agent-base
+#
+# Runtime:
+#   docker run \
+#     -v $(pwd)/config/config.edge.docker.yaml:/app/config/config.yaml:ro \
+#     -e POND_CONFIG=/app/config/config.yaml \
+#     y-ai-pond-edge:0.1.0
+#
+# ── Stage 1: Build ──────────────────────────────────────────────────────────
+
+FROM golang:1.25-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /src
+
+# Copy local y-ai-agent-base dependency (requires BuildKit — see Dockerfile for details)
+COPY --from=yaiagentbase . /y-ai-agent-base
+
+# Download Go module dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source and build edge binary
+COPY . .
+RUN CGO_ENABLED=0 go build \
+  -ldflags="-s -w" \
+  -trimpath \
+  -o /app/edge \
+  ./cmd/edge
+
+# ── Stage 2: Runtime ───────────────────────────────────────────────────────
+
+FROM alpine:3.21
+
+RUN apk add --no-cache ca-certificates tzdata
+
+# Non-root user
+RUN adduser -D -H appuser
+
+WORKDIR /app
+COPY --from=builder /app/edge .
+
+RUN mkdir -p /app/config /app/data && \
+  chown -R appuser:appuser /app
+
+USER appuser
+
+# Edge controller is a long-running process; no HTTP health endpoint yet.
+# HEALTHCHECK uses process check (pgrep) once the controller main loop is
+# implemented (T8+). For now the stub exits immediately — the restart policy
+# in docker-compose.edge.yml handles it.
+# HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+#   CMD pgrep edge || exit 1
+
+ENTRYPOINT ["/app/edge"]

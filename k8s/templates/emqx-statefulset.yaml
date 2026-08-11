@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "emqx") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: emqx
+spec:
+  serviceName: {{ include "y-ai-pond.componentName" (list . "emqx-headless") }}
+  replicas: {{ .Values.emqx.replicas }}
+  selector:
+    matchLabels:
+      {{- include "y-ai-pond.componentLabels" (list . "emqx") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "y-ai-pond.componentLabels" (list . "emqx") | nindent 8 }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: emqx
+          image: "{{ .Values.emqx.image.repository }}:{{ .Values.emqx.image.tag }}"
+          imagePullPolicy: {{ .Values.emqx.image.pullPolicy }}
+          env:
+            - name: EMQX_NAME
+              value: "y-ai-pond-broker"
+            - name: EMQX_ALLOW_ANONYMOUS
+              value: "true"
+          ports:
+            - name: mqtt
+              containerPort: {{ .Values.emqx.service.mqttPort }}
+              protocol: TCP
+            - name: dashboard
+              containerPort: {{ .Values.emqx.service.dashboardPort }}
+              protocol: TCP
+            - name: internal
+              containerPort: {{ .Values.emqx.internalPort }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.emqx.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - emqx
+                - ctl
+                - status
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - emqx
+                - ctl
+                - status
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: emqx-data
+              mountPath: /opt/emqx/data
+            - name: emqx-log
+              mountPath: /opt/emqx/log
+  {{- if .Values.emqx.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: emqx-data
+        labels:
+          {{- include "y-ai-pond.labels" . | nindent 10 }}
+          app.kubernetes.io/component: emqx
+      spec:
+        accessModes:
+          - {{ .Values.emqx.persistence.dataAccessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.emqx.persistence.size }}
+    - metadata:
+        name: emqx-log
+        labels:
+          {{- include "y-ai-pond.labels" . | nindent 10 }}
+          app.kubernetes.io/component: emqx
+      spec:
+        accessModes:
+          - {{ .Values.emqx.persistence.logAccessMode }}
+        resources:
+          requests:
+            storage: 5Gi
+  {{- end }}

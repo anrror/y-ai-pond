@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package y_ai_pond.sensor.v1;
+
+option go_package = "github.com/anrror/y-ai-pond/pkg/proto;proto";
+
+// SensorReading is the unified sensor data message for pond water quality.
+// All fields are transmitted as binary Protobuf via MQTT (QoS 0) for
+// high-frequency telemetry from ESP32-S3 sensor nodes to the edge controller.
+message SensorReading {
+  string device_id = 1;    // Unique sensor node identifier (e.g. "esp32-s3-01")
+  int64 timestamp = 2;     // Unix timestamp in milliseconds
+  float ph = 3;            // pH value (0–14)
+  float do = 4;            // Dissolved oxygen in mg/L (0–20)
+  float temp = 5;          // Water temperature in °C (0–50)
+  float nh3 = 6;           // Ammonia nitrogen in mg/L (0–10)
+  float turbidity = 7;     // Turbidity in NTU (0–3000)
+  float water_level = 8;   // Water level in cm
+}

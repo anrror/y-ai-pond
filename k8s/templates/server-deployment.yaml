@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "server") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.server.replicas }}
+  selector:
+    matchLabels:
+      {{- include "y-ai-pond.componentLabels" (list . "server") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "y-ai-pond.componentLabels" (list . "server") | nindent 8 }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "y-ai-pond.componentName" (list . "sa") }}
+      containers:
+        - name: server
+          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          env:
+            - name: POND_CONFIG
+              value: "/app/config/config.yaml"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "y-ai-pond.componentName" (list . "secret") }}
+                  key: JWT_SECRET
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "y-ai-pond.componentName" (list . "secret") }}
+                  key: POSTGRES_PASSWORD
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "y-ai-pond.componentName" (list . "secret") }}
+                  key: INFLUXDB_TOKEN
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.server.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.server.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.server.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.server.probes.readiness.failureThreshold }}
+          volumeMounts:
+            - name: config
+              mountPath: {{ .Values.server.configMountPath }}
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "y-ai-pond.componentName" (list . "config") }}

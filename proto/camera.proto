@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package y_ai_pond.camera.v1;
+
+option go_package = "github.com/anrror/y-ai-pond/pkg/proto;proto";
+
+// Behavior classifies the observed fish group behavior from YOLOv8n inference.
+enum Behavior {
+  BEHAVIOR_UNSPECIFIED = 0;
+  BEHAVIOR_AGGREGATING = 1;  // Fish gathering together (normal)
+  BEHAVIOR_SCATTERING = 2;   // Fish dispersing (alarm/threat)
+  BEHAVIOR_FEEDING = 3;      // Fish actively feeding (positive feeding signal)
+}
+
+// InferenceResult is the output of the edge YOLOv8n vision pipeline.
+// Published via MQTT QoS 0 to avoid bandwidth saturation from ~100 FPS inference.
+message InferenceResult {
+  int32 fish_count = 1;            // Number of fish detected in frame
+  repeated float sizes = 2;        // Estimated fish body lengths in mm, one per detected fish
+  Behavior behavior = 3;           // Dominant group behavior classification
+  float texture_energy = 4;        // Surface water texture energy (0.0–1.0) for feeding intensity estimation
+}

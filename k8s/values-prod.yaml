@@ -1,0 +1,87 @@
+# y-ai-pond Helm chart — 生产环境覆盖配置
+#
+# 使用方式:
+#   helm install y-ai-pond ./k8s/ -f k8s/values-prod.yaml
+#
+# 此文件仅覆盖需要与默认值不同的配置项。所有未列出的项使用 values.yaml 默认值。
+
+# ── Server ────────────────────────────────────────────────────────────────────
+server:
+  replicas: 3
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "1Gi"
+
+# ── HPA ───────────────────────────────────────────────────────────────────────
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: "nginx"
+  # 修改为实际生产域名
+  host: "pond.example.com"
+  tls:
+    enabled: true
+    secretName: "pond-example-tls"
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# 生产环境请通过外部 secret management (Vault/Sealed Secrets) 注入，或通过
+# helm install --set secrets.jwtSecret=<real-secret> 覆盖。
+# 以下为空占位，必须覆盖后才能部署。
+secrets:
+  jwtSecret: ""
+  postgresPassword: ""
+  influxdbToken: ""
+  influxdbAdminPassword: ""
+
+# ── 持久化大小 (生产环境建议扩大) ──────────────────────────────────────────────
+influxdb3:
+  persistence:
+    size: 200Gi
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+    limits:
+      cpu: "4000m"
+      memory: "8Gi"
+
+postgresql:
+  persistence:
+    size: 100Gi
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+
+redis:
+  persistence:
+    size: 10Gi
+
+emqx:
+  replicas: 2
+  persistence:
+    size: 20Gi
+
+# ── Gotenberg (可选, 未安装 Chrome/LibreOffice 时禁用节省资源) ─────────────────
+gotenberg:
+  enabled: true
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"

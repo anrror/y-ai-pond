@@ -1,0 +1,54 @@
+# y-ai-pond development overrides
+#
+# Auto-merged by `docker compose up` when this file exists alongside
+# docker-compose.yml. Adds dev-friendly settings: port exposure for databases,
+# hot-reload mounts, debug ports, relaxed health check intervals.
+#
+# To skip these overrides in CI/production:
+#   docker compose -f docker-compose.yml up -d
+
+services:
+  # ── Server: Hot reload + debug ─────────────────────────────────────────
+  server:
+    ports:
+      - "8080:8080"
+      - "2345:2345"     # Delve debugger (dlv attach)
+      - "6060:6060"     # pprof HTTP server (if enabled)
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.docker.yaml:ro
+      - server_data:/app/data
+      # Mount source for hot-reload with air / realize / CompileDaemon:
+      # (requires a hot-reload wrapper — uncomment and adjust entrypoint)
+      # - ./cmd:/app/cmd:ro
+      # - ./internal:/app/internal:ro
+      # - ./pkg:/app/pkg:ro
+    environment:
+      POND_CONFIG: /app/config/config.docker.yaml
+      GIN_MODE: debug
+    healthcheck:
+      interval: 30s   # Relaxed for dev (default 15s)
+
+  # ── Expose database ports for local dev tools ──────────────────────────
+  postgres:
+    ports:
+      - "5432:5432"
+
+  influxdb3:
+    ports:
+      - "8086:8086"    # Management / v1 compatibility
+      - "8181:8181"    # InfluxDB 3 HTTP write/query (SQL)
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # ── Gotenberg: Expose port for dev PDF preview ─────────────────────────
+  gotenberg:
+    ports:
+      - "3000:3000"
+
+  # ── ClickHouse: Expose when profile is active ──────────────────────────
+  # clickhouse:
+  #   ports:
+  #     - "8123:8123"    # HTTP interface
+  #     - "9000:9000"    # Native TCP

@@ -1,0 +1,230 @@
+# y-ai-pond Helm chart — default values
+#
+# 所有可配置项均有合理默认值。生产环境请复制 values-prod.yaml 并根据实际环境修改。
+
+# ── 全局设置 ──────────────────────────────────────────────────────────────────
+global:
+  # 时区（容器内）
+  timezone: "Asia/Shanghai"
+  # 命名空间级别镜像拉取密钥（可选）
+  imagePullSecrets: []
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+
+# ── Server (云端 HTTP 服务) ───────────────────────────────────────────────────
+server:
+  image:
+    repository: y-ai-pond
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 2
+  service:
+    type: ClusterIP
+    port: 8080
+  # Readiness/Liveness 探针
+  probes:
+    readiness:
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
+    liveness:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 5
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "512Mi"
+  # Config 文件挂载路径
+  configMountPath: "/app/config"
+
+# ── HPA (弹性伸缩) ────────────────────────────────────────────────────────────
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# ── EMQX (MQTT Broker) ──────────────────────────────────────────────────────
+emqx:
+  image:
+    repository: emqx/emqx
+    tag: "5.8"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  statefulSet:
+    # 是否使用 StatefulSet (集群模式需 2+ 副本)
+    enabled: true
+  # MQTT 端口
+  service:
+    mqttPort: 1883
+    dashboardPort: 18083
+  # 内部通信端口
+  internalPort: 4370
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: 10Gi
+    dataAccessMode: ReadWriteOnce
+    logAccessMode: ReadWriteOnce
+
+# ── InfluxDB 3 (时序数据库) ──────────────────────────────────────────────────
+influxdb3:
+  image:
+    repository: influxdb
+    tag: "3.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 8086
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: 50Gi
+    accessMode: ReadWriteOnce
+
+# ── PostgreSQL + TimescaleDB ─────────────────────────────────────────────────
+postgresql:
+  image:
+    repository: timescale/timescaledb
+    tag: "2.17-pg16"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 5432
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "2000m"
+      memory: "2Gi"
+  persistence:
+    enabled: true
+    size: 20Gi
+    accessMode: ReadWriteOnce
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis:
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 6379
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  # Redis 数据持久化 (AOF)
+  persistence:
+    enabled: true
+    size: 5Gi
+    accessMode: ReadWriteOnce
+
+# ── Gotenberg (文档转换, 可选) ───────────────────────────────────────────────
+gotenberg:
+  enabled: true
+  image:
+    repository: gotenberg/gotenberg
+    tag: "8"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 3000
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+  command:
+    - "gotenberg"
+    - "--chromium-disable-routes=true"
+    - "--libreoffice-disable-routes=true"
+    - "--api-port=3000"
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "y-ai-pond.example.com"
+  # TLS 配置（可选）
+  tls:
+    enabled: false
+    secretName: "y-ai-pond-tls"
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# 生产环境请通过 values-prod.yaml 或 --set 覆盖。
+# 默认值仅供开发/测试，不可用于生产。
+secrets:
+  jwtSecret: "change-me-in-production-use-helm-override"
+  postgresPassword: "pond"
+  influxdbToken: "y-ai-pond-dev-token"
+  influxdbAdminPassword: "admin123"
+
+# ── 应用配置 (注入到 ConfigMap, 挂载为 config.yaml) ──────────────────────────
+# 注意：服务地址中的 hostname 必须与 helm install 的 release 名称一致。
+# 默认 release 名为 y-ai-pond，对应 k8s Service 名 y-ai-pond-<component>。
+# 若使用不同的 release 名（如 helm install my-pond ./k8s/），需同步修改以下地址。
+config:
+  server:
+    port: 8080
+    sseTimeout: 0    # 0 = SSE 连接永不过期
+  mqtt:
+    brokerUrl: "tcp://y-ai-pond-emqx:1883"
+    clientId: "y-ai-pond-cloud"
+    keepalive: 20
+    sessionExpiry: 3600
+  database:
+    postgresDsn: "postgres://pond:$(POSTGRES_PASSWORD)@y-ai-pond-postgresql:5432/y-ai-pond?sslmode=disable"
+    influxdb:
+      url: "http://y-ai-pond-influxdb3:8086"
+      token: "$(INFLUXDB_TOKEN)"
+      org: "y-ai-pond"
+    redisAddr: "y-ai-pond-redis:6379"
+  auth:
+    jwtSecret: "$(JWT_SECRET)"
+    tokenTtl: 86400
+  models:
+    registryDir: "/app/config/models/"
+    paths:
+      forecast: "forecast.onnx"
+      growth: "growth.onnx"
+      rl: "rl_policy.onnx"
+      dtGnn: "dt_gnn.onnx"
+  edge:
+    sensorIntervals:
+      ph: 30
+      do: 10
+      temp: 60
+      nh3: 30
+      turbidity: 30
+      waterLevel: 60
+
+# ── ServiceAccount ────────────────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  name: "y-ai-pond"

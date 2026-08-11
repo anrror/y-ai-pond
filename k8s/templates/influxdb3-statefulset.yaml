@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "influxdb3") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: influxdb3
+spec:
+  serviceName: {{ include "y-ai-pond.componentName" (list . "influxdb3") }}
+  replicas: {{ .Values.influxdb3.replicas }}
+  selector:
+    matchLabels:
+      {{- include "y-ai-pond.componentLabels" (list . "influxdb3") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "y-ai-pond.componentLabels" (list . "influxdb3") | nindent 8 }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: influxdb3
+          image: "{{ .Values.influxdb3.image.repository }}:{{ .Values.influxdb3.image.tag }}"
+          imagePullPolicy: {{ .Values.influxdb3.image.pullPolicy }}
+          env:
+            - name: INFLUXDB_ORG
+              value: "y-ai-pond"
+            - name: INFLUXDB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "y-ai-pond.componentName" (list . "secret") }}
+                  key: INFLUXDB_TOKEN
+            - name: INFLUXDB_ADMIN_USER
+              value: "admin"
+            - name: INFLUXDB_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "y-ai-pond.componentName" (list . "secret") }}
+                  key: INFLUXDB_ADMIN_PASSWORD
+          ports:
+            - name: http
+              containerPort: {{ .Values.influxdb3.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.influxdb3.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - influxdb3
+                - "--version"
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - influxdb3
+                - "--version"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/influxdb
+      {{- if not .Values.influxdb3.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.influxdb3.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "y-ai-pond.labels" . | nindent 10 }}
+          app.kubernetes.io/component: influxdb3
+      spec:
+        accessModes:
+          - {{ .Values.influxdb3.persistence.accessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.influxdb3.persistence.size }}
+  {{- end }}

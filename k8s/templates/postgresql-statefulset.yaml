@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "postgresql") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  serviceName: {{ include "y-ai-pond.componentName" (list . "postgresql") }}
+  replicas: {{ .Values.postgresql.replicas }}
+  selector:
+    matchLabels:
+      {{- include "y-ai-pond.componentLabels" (list . "postgresql") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "y-ai-pond.componentLabels" (list . "postgresql") | nindent 8 }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgresql
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          env:
+            - name: POSTGRES_USER
+              value: "pond"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "y-ai-pond.componentName" (list . "secret") }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: "y-ai-pond"
+          ports:
+            - name: postgresql
+              containerPort: {{ .Values.postgresql.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - pond
+                - -d
+                - y-ai-pond
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - pond
+                - -d
+                - y-ai-pond
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      {{- if not .Values.postgresql.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "y-ai-pond.labels" . | nindent 10 }}
+          app.kubernetes.io/component: postgresql
+      spec:
+        accessModes:
+          - {{ .Values.postgresql.persistence.accessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size }}
+  {{- end }}

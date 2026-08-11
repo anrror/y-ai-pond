@@ -1,0 +1,43 @@
+# Headless Service for EMQX cluster discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "emqx-headless") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: emqx
+spec:
+  clusterIP: None
+  ports:
+    - name: mqtt
+      port: {{ .Values.emqx.service.mqttPort }}
+      targetPort: mqtt
+      protocol: TCP
+    - name: dashboard
+      port: {{ .Values.emqx.service.dashboardPort }}
+      targetPort: dashboard
+      protocol: TCP
+  selector:
+    {{- include "y-ai-pond.componentLabels" (list . "emqx") | nindent 4 }}
+---
+# ClusterIP Service for stable app access to EMQX
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "emqx") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: emqx
+spec:
+  type: ClusterIP
+  ports:
+    - name: mqtt
+      port: {{ .Values.emqx.service.mqttPort }}
+      targetPort: mqtt
+      protocol: TCP
+    - name: dashboard
+      port: {{ .Values.emqx.service.dashboardPort }}
+      targetPort: dashboard
+      protocol: TCP
+  selector:
+    {{- include "y-ai-pond.componentLabels" (list . "emqx") | nindent 4 }}

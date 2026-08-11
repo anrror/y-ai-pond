@@ -1,0 +1,46 @@
+# Build artifacts
+bin/
+dist/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# AI-OS harness (not needed in image)
+.ai/
+.omo/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed at runtime)
+doc/
+*.md
+!README.md
+
+# Test files
+*_test.go
+integration/
+benchmark/
+security/
+coverage.out
+*.out
+
+# Python training (offline only, not deployed)
+python/
+
+# Environment files (secrets — use docker compose env_file instead)
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go module cache (downloaded by go mod download in build stage)
+vendor/

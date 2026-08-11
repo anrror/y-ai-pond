@@ -1,0 +1,42 @@
+# y-ai-pond configuration
+# All durations: seconds (unless suffix is used, e.g. "60s", "1h")
+
+server:
+  port: 8080
+  sse_timeout: 0    # 0 = no timeout, SSE connections live indefinitely
+
+mqtt:
+  broker_url: "tcp://localhost:1883"
+  client_id: "y-ai-pond-cloud"
+  keepalive: 20      # seconds
+  session_expiry: 3600  # seconds (1h)
+
+database:
+  postgres_dsn: "postgres://pond:pond@localhost:5432/y-ai-pond?sslmode=disable"
+  influxdb:
+    url: "http://localhost:8086"
+    token: ""
+    org: "y-ai-pond"
+  redis_addr: "localhost:6379"
+
+auth:
+  jwt_secret: "dev-only-secret-change-me"
+  token_ttl: 86400    # seconds (24h); 0 -> default 24h
+
+models:
+  registry_dir: "config/models/"
+  # Per-type model paths (relative to registry_dir)
+  paths:
+    forecast: "forecast.onnx"
+    growth: "growth.onnx"
+    rl: "rl_policy.onnx"
+    dt_gnn: "dt_gnn.onnx"
+
+edge:
+  sensor_intervals:
+    ph: 30      # seconds
+    do: 10      # seconds
+    temp: 60    # seconds
+    nh3: 30     # seconds
+    turbidity: 30  # seconds
+    water_level: 60  # seconds

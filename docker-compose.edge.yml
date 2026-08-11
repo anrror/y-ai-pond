@@ -1,0 +1,73 @@
+# y-ai-pond edge deployment (TIER 1)
+#
+# Runs the edge controller alongside a local MQTT broker.
+# No cloud dependencies — self-contained on the edge device (RK3588 / Jetson).
+#
+# Usage:
+#   docker compose -f docker-compose.edge.yml up -d
+#   docker compose -f docker-compose.edge.yml logs -f edge
+#   docker compose -f docker-compose.edge.yml down
+#
+# Build context requires y-ai-agent-base at ../y-ai-agent-base (BuildKit).
+
+name: y-ai-pond-edge
+
+services:
+  # ── Edge Controller (Go binary) ────────────────────────────────────────
+  edge:
+    build:
+      context: .
+      dockerfile: Dockerfile.edge
+      additional_contexts:
+        yaiagentbase: ../y-ai-agent-base
+    image: y-ai-pond-edge:0.1.0
+    container_name: y-ai-pond-edge
+    environment:
+      POND_CONFIG: /app/config/config.yaml
+    volumes:
+      - ./config/config.edge.docker.yaml:/app/config/config.yaml:ro
+      - edge_data:/app/data
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    # Restart policy keeps the controller alive; the stub exits immediately
+    # now but will run continuously once the main control loop (T8+) is
+    # implemented.
+    restart: unless-stopped
+
+  # ── Local MQTT Broker (Mosquitto 2.0) ──────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: y-ai-pond-edge-mosquitto
+    ports:
+      - "1883:1883"    # MQTT TCP
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    # Mosquitto 2.0 requires explicit listener configuration for anonymous
+    # access (suitable for edge deployment; use TLS + auth in production).
+    command: >
+      mosquitto -c /mosquitto-no-auth.conf
+    configs:
+      - source: mosquitto_conf
+        target: /mosquitto-no-auth.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-W", "2"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+configs:
+  mosquitto_conf:
+    content: |
+      listener 1883
+      allow_anonymous true
+      # Enable WebSocket for browser-based MQTT clients (optional)
+      # listener 9001
+      # protocol websockets
+
+volumes:
+  edge_data:
+  mosquitto_data:
+  mosquitto_log:

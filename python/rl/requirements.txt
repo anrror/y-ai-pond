@@ -1,0 +1,10 @@
+# DDPG RL feeding optimization — offline training only.
+# These packages are NEVER deployed to production.
+# The Go inference engine (pkg/cloud/rl/) loads the exported ONNX model.
+
+gymnasium>=1.0.0
+stable-baselines3>=2.3.0
+torch>=2.0.0
+numpy>=1.24.0
+onnx>=1.14.0
+onnxruntime>=1.16.0

@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package y_ai_pond.control.v1;
+
+option go_package = "github.com/anrror/y-ai-pond/pkg/proto;proto";
+
+// FeedingCommand is a control instruction sent from cloud to edge
+// to start or adjust feeding motor operation.
+message FeedingCommand {
+  float speed_rpm = 1;     // Target motor speed in RPM
+  int64 duration_ms = 2;   // Feeding duration in milliseconds
+}
+
+// FeedingState represents the current operational state of the feeding motor.
+enum FeedingState {
+  FEEDING_STATE_UNSPECIFIED = 0;
+  FEEDING_STATE_IDLE = 1;       // Motor stopped, no active feeding
+  FEEDING_STATE_RUNNING = 2;    // Motor running, feed being dispensed
+  FEEDING_STATE_PAUSED = 3;     // Motor paused (e.g. by safety interlock)
+  FEEDING_STATE_COMPLETED = 4;  // Feeding cycle completed successfully
+  FEEDING_STATE_ERROR = 5;      // Motor error (e.g. overload, jam)
+}
+
+// FeedingStatus reports the current feeding motor state from edge to cloud.
+message FeedingStatus {
+  float speed_rpm = 1;       // Current motor speed in RPM
+  int64 duration_ms = 2;     // Total feeding duration in milliseconds
+  float remaining_g = 3;     // Remaining feed weight in grams
+  FeedingState state = 4;    // Current motor operational state
+}
+
+// ControlDecision records the Fuzzy-PID controller's reasoning and output.
+// Published to MQTT for audit, analytics, and RL training data.
+message ControlDecision {
+  map<string, float> fuzzy_inputs = 1;  // Fuzzified input variables (e.g. "fish_density": 0.8)
+  repeated string rules_fired = 2;       // Names of Mamdani rules that fired (e.g. "R12: HIGH_density + NORMAL_DO → INCREASE")
+  float output_speed = 3;               // Final output motor speed in RPM
+  int64 output_duration_ms = 4;          // Final output feeding duration in milliseconds
+}

@@ -1,0 +1,92 @@
+# === AI / Dev tooling ===
+.ai/
+.ai/*
+.omo/
+.omo/*
+.agents/
+.opencode/
+.codex/
+.claude/
+.cursor/
+.copilot/
+.windsurf/
+AGENTS.md
+
+# === Environment & Secrets ===
+.env
+.env.*
+*.env
+!.env.example
+*.local
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+credentials*
+secrets*
+secret*
+!k8s/templates/secret.yaml
+
+# === IDE & Editor ===
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# === Build & Cache ===
+node_modules/
+dist/
+build/
+target/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+*.egg-info/
+*.exe
+*.out
+*.test
+
+# === Dependencies ===
+vendor/
+.pnpm-store/
+.yarn/
+
+# === Logs & Debug ===
+*.log
+*.pid
+*.seed
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Temporary ===
+*.tmp
+*.temp
+*.bak
+*.swp
+*.orig
+
+# === Go ===
+*.exe~
+server.exe
+server.test.exe
+06-mcp-client.exe

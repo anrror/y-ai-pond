@@ -1,0 +1,171 @@
+# y-ai-pond production stack
+#
+# Usage:
+#   1. Copy .env.example to .env and edit credentials.
+#   2. Copy config/config.docker.yaml to config/config.docker.prod.yaml and edit.
+#   3. Update the server volume mount below to use config.docker.prod.yaml.
+#   4. Start:  docker compose up -d
+#   5. Verify: docker compose exec server curl -f http://localhost:8080/health
+#   6. Stop:   docker compose down
+#
+# Development overrides are in docker-compose.override.yml (auto-merged).
+# Edge deployment: docker compose -f docker-compose.edge.yml up -d
+
+name: y-ai-pond
+
+services:
+  # ── Cloud Server (TIER 2) ──────────────────────────────────────────────
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      additional_contexts:
+        yaiagentbase: ../y-ai-agent-base
+    image: y-ai-pond:0.1.0
+    container_name: y-ai-pond-server
+    ports:
+      - "8080:8080"
+    environment:
+      POND_CONFIG: /app/config/config.docker.yaml
+    volumes:
+      - ./config/config.docker.yaml:/app/config/config.docker.yaml:ro
+      - server_data:/app/data
+    depends_on:
+      emqx:
+        condition: service_healthy
+      influxdb3:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+
+  # ── MQTT Broker (EMQX v5) ──────────────────────────────────────────────
+  emqx:
+    image: emqx/emqx:5.8
+    container_name: y-ai-pond-emqx
+    ports:
+      - "1883:1883"    # MQTT TCP
+      - "18083:18083"  # Dashboard
+    environment:
+      EMQX_NAME: y-ai-pond-broker
+      EMQX_ALLOW_ANONYMOUS: "true"
+    volumes:
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    healthcheck:
+      test: ["CMD", "emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Time-Series Database (InfluxDB 3) ──────────────────────────────────
+  influxdb3:
+    image: influxdb:3.0
+    container_name: y-ai-pond-influxdb3
+    environment:
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-y-ai-pond}
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN:-y-ai-pond-dev-token}
+      INFLUXDB_ADMIN_USER: ${INFLUXDB_ADMIN_USER:-admin}
+      INFLUXDB_ADMIN_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-admin123}
+    volumes:
+      - influxdb3_data:/var/lib/influxdb
+    healthcheck:
+      test: ["CMD", "influxdb3", "--version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Relational Database (PostgreSQL + TimescaleDB) ─────────────────────
+  postgres:
+    image: timescale/timescaledb:2.17-pg16
+    container_name: y-ai-pond-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pond}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pond}
+      POSTGRES_DB: ${POSTGRES_DB:-y-ai-pond}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pond} -d ${POSTGRES_DB:-y-ai-pond}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Cache & Pub/Sub (Redis) ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: y-ai-pond-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Document Conversion (Gotenberg) ────────────────────────────────────
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    container_name: y-ai-pond-gotenberg
+    # Gotenberg is an internal service — no host port exposure in production.
+    # The server communicates with Gotenberg over the internal Docker network.
+    # For dev debugging, uncomment or use docker-compose.override.yml.
+    # ports:
+    #   - "3000:3000"
+    command:
+      - "gotenberg"
+      - "--chromium-disable-routes=true"    # Disable Chromium (not needed for PDF rendering)
+      - "--libreoffice-disable-routes=true"  # Disable LibreOffice (not needed)
+      - "--api-port=3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Analytics Database (ClickHouse, optional) ──────────────────────────
+  # Uncomment to enable high-performance analytics queries.
+  # Start with: docker compose --profile analytics up -d
+  # clickhouse:
+  #   image: clickhouse/clickhouse-server:24.12-alpine
+  #   container_name: y-ai-pond-clickhouse
+  #   profiles:
+  #     - analytics
+  #   environment:
+  #     CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+  #     CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse}
+  #     CLICKHOUSE_DB: ${CLICKHOUSE_DB:-y-ai-pond}
+  #   volumes:
+  #     - clickhouse_data:/var/lib/clickhouse
+  #   healthcheck:
+  #     test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+  #     interval: 15s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: unless-stopped
+
+volumes:
+  server_data:
+  emqx_data:
+  emqx_log:
+  influxdb3_data:
+  postgres_data:
+  redis_data:
+  # clickhouse_data:

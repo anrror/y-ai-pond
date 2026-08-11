@@ -1,0 +1,16 @@
+apiVersion: v2
+name: y-ai-pond
+description: "Helm chart for y-ai-pond — 智慧水产养殖管理平台 (三态架构: 边缘 + 云端 + 数字孪生)"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - aquaculture
+  - iot
+  - digital-twin
+  - edge-computing
+  - mqtt
+  - ai
+maintainers:
+  - name: anrror
+    email: anrror@users.noreply.github.com

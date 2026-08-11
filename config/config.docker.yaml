@@ -1,0 +1,49 @@
+# y-ai-pond Docker production configuration
+#
+# All hostnames reference Docker Compose service names (DNS resolution).
+# Secrets (JWT, tokens, passwords) should be injected via environment variables
+# in docker-compose.yml or a .env file — NOT hardcoded here.
+#
+# Copy this file and replace placeholder values before deploying:
+#   cp config/config.docker.yaml config/config.docker.prod.yaml
+#   # edit config.docker.prod.yaml with real credentials
+#   # update docker-compose.yml volume mount to use config.docker.prod.yaml
+
+server:
+  port: 8080
+  sse_timeout: 0        # 0 = no timeout, SSE connections live indefinitely
+
+mqtt:
+  broker_url: "tcp://emqx:1883"     # Docker Compose service name
+  client_id: "y-ai-pond-cloud"
+  keepalive: 20
+  session_expiry: 3600               # seconds (1h)
+
+database:
+  postgres_dsn: "postgres://pond:pond@postgres:5432/y-ai-pond?sslmode=disable"
+  influxdb:
+    url: "http://influxdb3:8086"    # Docker Compose service name
+    token: ""                        # Set via docker-compose environment or .env
+    org: "y-ai-pond"
+  redis_addr: "redis:6379"           # Docker Compose service name
+
+auth:
+  jwt_secret: "change-me-in-production-use-env-override"
+  token_ttl: 86400                   # seconds (24h)
+
+models:
+  registry_dir: "/app/config/models/"
+  paths:
+    forecast: "forecast.onnx"
+    growth: "growth.onnx"
+    rl: "rl_policy.onnx"
+    dt_gnn: "dt_gnn.onnx"
+
+edge:
+  sensor_intervals:
+    ph: 30
+    do: 10
+    temp: 60
+    nh3: 30
+    turbidity: 30
+    water_level: 60

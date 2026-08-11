@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "y-ai-pond.componentName" (list . "config") }}
+  labels:
+    {{- include "y-ai-pond.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+data:
+  config.yaml: |
+{{ include "y-ai-pond.serverConfig" . | indent 4 }}

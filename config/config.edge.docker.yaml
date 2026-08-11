@@ -1,0 +1,46 @@
+# y-ai-pond edge controller — Docker Compose configuration
+#
+# Edge controller connects to the local MQTT broker (mosquitto in the same
+# docker-compose.edge.yml network). No cloud database connections needed —
+# the edge runs locally with SQLite buffering.
+
+server:
+  port: 8080             # Not used on edge; kept for config struct compatibility
+  sse_timeout: 0
+
+mqtt:
+  broker_url: "tcp://mosquitto:1883"  # Docker Compose service name
+  client_id: "y-ai-pond-edge"
+  keepalive: 20
+  session_expiry: 3600
+
+database:
+  # Edge controller does NOT connect to cloud databases directly.
+  # Local SQLite is used for offline buffering (configured separately).
+  postgres_dsn: ""
+  influxdb:
+    url: ""
+    token: ""
+    org: ""
+  redis_addr: ""
+
+auth:
+  jwt_secret: ""
+  token_ttl: 0
+
+models:
+  registry_dir: "/app/config/models/"
+  paths:
+    forecast: ""
+    growth: ""
+    rl: ""
+    dt_gnn: ""
+
+edge:
+  sensor_intervals:
+    ph: 30
+    do: 10
+    temp: 60
+    nh3: 30
+    turbidity: 30
+    water_level: 60

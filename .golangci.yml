@@ -1,0 +1,38 @@
+version: "2"
+
+run:
+  timeout: 3m
+  modules-download-mode: readonly
+  tests: true
+  allow-parallel-runners: true
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosec
+    - misspell
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    staticcheck:
+      checks: ["all", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
